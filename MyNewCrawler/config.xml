@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+	<!-- <CrawlSeedFile>
+		/home/neeraj/Documents/crawlerdata.tmp/CrawlTheseURLs.txt
+	</CrawlSeedFile> -->
+	<CrawlSeedFile>
+		/Users/yichen/Documents/crawlerdata.tmp/CrawlTheseURLs.txt
+	</CrawlSeedFile>
+	<DefaultWeighttOfSeed>
+		100
+	</DefaultWeighttOfSeed>
+	<NumberOfTriesOnURLBeforeGiveUp>
+		5
+	</NumberOfTriesOnURLBeforeGiveUp>
+	<NumberOfTriesBeforeGivingUpOnQueue>
+		10
+	</NumberOfTriesBeforeGivingUpOnQueue>	
+	<MaxDepth>
+		10
+	</MaxDepth>
+	<MaxBreadth>
+		10
+	</MaxBreadth>
+	<MaxURLs>
+		10
+	</MaxURLs>
+	<NumberOfThreads>
+		10
+	</NumberOfThreads>
+	<PolitenessInMS>
+		100
+	</PolitenessInMS>
+	<!-- <DownloadDirectory>
+		/home/neeraj/Documents/DownloadExperiment.tmp/
+	</DownloadDirectory> -->
+	<DownloadDirectory>
+		/Users/yichen/Documents/DownloadExperiment.tmp/
+	</DownloadDirectory>	
+	<NumberOfDownloadSubDirs>
+		10
+	</NumberOfDownloadSubDirs>	
+	<OutputFormat>
+		BOTHHTMLANDTEXT
+	</OutputFormat><!-- Options: HTMLONLY, TEXTONLY, BOTHHTMLANDTEXT -->
+	<PathAndFileToOutputDictionary>
+		/Users/yichen/EZCrawler/Dictionary.txt
+	</PathAndFileToOutputDictionary>
+	<PreferedURLRegexes>
+		asd[0-9]
+		
+		dfg*
+	</PreferedURLRegexes>
+	<AvoidURLRegexes>
+		erg
+		rgs
+	</AvoidURLRegexes>
+	<PreferedURLText>
+		Tesla	0.5
+		Olympics	0.7
+		reform	0.9
+		people	0.4
+	</PreferedURLText>	
+</configuration>
