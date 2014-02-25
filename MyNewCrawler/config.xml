@@ -6,9 +6,9 @@
 	<CrawlSeedFile>
 		/Users/yichen/Documents/crawlerdata.tmp/CrawlTheseURLs.txt
 	</CrawlSeedFile>
-	<DefaultWeighttOfSeed>
+	<DefaultWeightOfSeed>
 		100
-	</DefaultWeighttOfSeed>
+	</DefaultWeightOfSeed>
 	<NumberOfTriesOnURLBeforeGiveUp>
 		5
 	</NumberOfTriesOnURLBeforeGiveUp>
@@ -16,16 +16,16 @@
 		10
 	</NumberOfTriesBeforeGivingUpOnQueue>	
 	<MaxDepth>
-		10
+		100
 	</MaxDepth>
 	<MaxBreadth>
-		10
+		200
 	</MaxBreadth>
-	<MaxURLs>
-		10
-	</MaxURLs>
+	<MaxURLsApproximately>
+		200
+	</MaxURLsApproximately>
 	<NumberOfThreads>
-		10
+		5
 	</NumberOfThreads>
 	<PolitenessInMS>
 		100
@@ -42,17 +42,19 @@
 	<OutputFormat>
 		BOTHHTMLANDTEXT
 	</OutputFormat><!-- Options: HTMLONLY, TEXTONLY, BOTHHTMLANDTEXT -->
-	<PathAndFileToOutputDictionary>
-		/Users/yichen/EZCrawler/Dictionary.txt
-	</PathAndFileToOutputDictionary>
-	<PreferedURLRegexes>
+	<PathToOutputDictionary>
+		/Users/yichen/Documents/DownloadExperiment.tmp/
+	</PathToOutputDictionary>
+	<StemForDictionary>
+		DownloadedFiles
+	</StemForDictionary>
+	<PreferredURLRegexes>
+		cnn
 		asd[0-9]
-		
 		dfg*
-	</PreferedURLRegexes>
+	</PreferredURLRegexes>
 	<AvoidURLRegexes>
-		erg
-		rgs
+		
 	</AvoidURLRegexes>
 	<PreferedURLText>
 		Tesla	0.5

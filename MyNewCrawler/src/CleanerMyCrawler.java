@@ -1,6 +1,8 @@
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -14,20 +16,26 @@ public class CleanerMyCrawler {
     String directory = null;
     final int SUBDIRMININDEX = 0;
     final int SUBDIRMAXINDEX = 20;
+    int downLoaded = 0;
     private java.util.concurrent.locks.ReentrantLock L = new java.util.concurrent.locks.ReentrantLock();
     private static XMLReader reader = null;
+    private String[] avoidURLRegexes = null;
+    private String[] preferredURLRegexes = null;
     
     public XMLReader getConfigReader() {
     	return reader;
     }
     
-    private void checkAndCreateDirectories () {
+    private void InitSetup () {
     	for (int i = 0; i < Integer.parseInt(reader.get("configuration|NumberOfDownloadSubDirs")); i++) {
 		    File theDir = new File(directory + "/" + i);
 		    if (!theDir.exists()) {
 		    	theDir.mkdir();  
 		    }
     	}
+ 		avoidURLRegexes = reader.get("configuration|AvoidURLRegexes").split("\\s+");
+ 		preferredURLRegexes = reader.get("configuration|PreferredURLRegexes").split("\\s+");
+    	
     }
     
     public String md5Hash(String s) {
@@ -47,19 +55,41 @@ public class CleanerMyCrawler {
     private class Worker implements Runnable {
 		Hashtable<String, Boolean> doneH = null;
 		multiStratQueue todoQ = null;
+		BufferedWriter output1 = null;
+		int myId = -1;
 		
 		public Worker(int id, multiStratQueue q, Hashtable<String, Boolean> h) {
 		    doneH = h;
 		    todoQ = q;
+		    myId = id;
 		}
 		
-		private double computeValue(String s) {
-		    double ret = 5;
-		    return ret;
-		}
+		
 		
 		public void run() {
-		    while (true) {
+			int  depthofParent = -1;
+			
+			String dictionaryFile = reader.get("configuration|PathToOutputDictionary") +
+					reader.get("configuration|StemForDictionary") + myId + ".txt";
+					
+			
+			try {
+			    File file = new File(dictionaryFile);
+			    if (!file.exists()) {
+					file.createNewFile();	
+				    output1 = new BufferedWriter(new FileWriter(dictionaryFile));
+					/*output.write(url.length() + "\t" + jp.getText().length() + "\t" + url + "\n");
+					output.write(jp.getText()+"\n");//use Yi's html parser*/
+			    } else {
+			    	return;//in an error situation just give up.
+			    }
+			} catch (Exception e) {
+			    System.out.println("Could not open " + dictionaryFile + " for url");
+			    return;
+			}
+			
+			boolean stop = false;
+		    while (!stop) {
 				String url = null;
 				int tried = 0;
 				JavaParser jp = new JavaParser();
@@ -68,6 +98,14 @@ public class CleanerMyCrawler {
 				    L.lock();
 				    String[] tmp = todoQ.dequeue("bestofmany");
 				    url = tmp[0];
+				    depthofParent = Integer.parseInt(tmp[2]);
+				    System.out.println("depth url configvalue: "+
+				    		depthofParent + " " +
+				    		url + " " +  Integer.parseInt(reader.get("configuration|MaxDepth")));
+				    		
+				    if (depthofParent >= Integer.parseInt(reader.get("configuration|MaxDepth"))) {
+				    	url = null;
+				    }
 				    System.out.println("URL found in queue: " + url);
 				    L.unlock();
 				    try {
@@ -77,11 +115,12 @@ public class CleanerMyCrawler {
 				}
 				
 				if (url == null) {
-				    System.out.println("I got nothing.\n");
-				    return;
+				    System.out.println("I got nothing. Exiting thread.\n");
+				    stop = true;
+				    //return;
 				} else {
 				    String md5 = md5Hash(url);
-				    int h = 0;//BUGBUG fix this hashing function if severely unbalanced.
+				    int h = 0; //BUGBUG fix this hashing function if severely unbalanced.
 				    for (int i = SUBDIRMININDEX; i <= SUBDIRMAXINDEX; i++) {
 				    	h += md5.charAt(i);
 				    }
@@ -92,21 +131,38 @@ public class CleanerMyCrawler {
 				    tried = 0;
 				    while ((tried < Integer.parseInt(reader.get("configuration|NumberOfTriesOnURLBeforeGiveUp")))) {	
 						tried++;
+						if (downLoaded > Integer.parseInt(reader.get("configuration|MaxURLsApproximately"))) {
+							continue;
+						}
+						System.out.println("Before JP process ");
 						if (jp.process(url)) {
+							downLoaded++;
+							System.out.println("Downloaded " + downLoaded);
+							try {
+								output1.write(url + "\t" + filename + "\n");
+								System.out.println(url + "\t" + filename + "*******\n");
+							} catch (IOException e1) {
+								e1.printStackTrace();
+							}
 						    System.out.println(url + " processed successfully. Tried " + tried + " times.");
 						    ArrayList<String> al = jp.getLinks("IGNORE THIS", true);
 						    Iterator<String> it = al.iterator();
 						    int linksAdded = 0;
 						    while ((it.hasNext()) && (linksAdded < Integer.parseInt(reader.get("configuration|MaxBreadth")))) {
 								String s = it.next();
+								if (mustAvoid(s)) {
+									continue;
+								}
 								String hashv = md5Hash(s);
-								double newval = computeValue(s);
+								double newval = computeURLValue(s) + computeTextValue(jp.getText());
 								L.lock();
 								if ((newval > 0) && (!doneH.containsKey(hashv))) {
 								    linksAdded++;
 								    doneH.put(hashv, true);
-								    todoQ.enqueue(s, newval);
-								    System.out.println(s + " added to queue.\n");
+								    todoQ.enqueue(s, newval, depthofParent+1);
+								    if (depthofParent > 1) {
+								    	System.out.println("New Depth " + depthofParent + " " + s + " added to queue.\n");
+								    }
 								}
 								L.unlock();		
 								try {
@@ -115,13 +171,14 @@ public class CleanerMyCrawler {
 										file.createNewFile();	
 										BufferedWriter output = new BufferedWriter(new FileWriter(file));
 										output.write(url.length() + "\t" + jp.getText().length() + "\t" + url + "\n");
-										output.write(jp.getText()+"\n");/*use Yi's html parser*/
+										output.write(jp.getText()+"\n");//use Yi's html parser
 										output.close();
 								    }
 								} catch (Exception e) {
 								    System.out.println("Could not open " + filename + " for url");
 								}
 						    }
+						    break;
 						} else {
 							System.out.println(url + " was not processed successfully. Tried " + tried + " times.");
 						    try {
@@ -145,6 +202,27 @@ public class CleanerMyCrawler {
 				    }
 				}
 		    }
+			if (output1 != null) {
+				try {
+					output1.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+			}
+		}
+
+		private boolean mustAvoid(String s) {
+			for (int i = 0; i < avoidURLRegexes.length; i++) {
+				if (avoidURLRegexes[i].indexOf('#') == 0) {
+					continue;
+				}
+				Pattern pattern = Pattern.compile(avoidURLRegexes[i]);
+				Matcher matcher = pattern.matcher(s);
+				if (matcher.find()) {
+				    return true;
+				}
+			}
+			return false;
 		}
     }
     
@@ -172,6 +250,25 @@ public class CleanerMyCrawler {
 		}
     }
     
+    private double computeURLValue(String s) {  
+	    for (int i = 0; i < preferredURLRegexes.length; i++) {
+			if (preferredURLRegexes[i].indexOf('#') == 0) {
+				continue;
+			}
+			Pattern pattern = Pattern.compile(preferredURLRegexes[i]);
+			Matcher matcher = pattern.matcher(s);
+			if (matcher.find()) {
+			    return 1.0;
+			}
+		}
+	    return 0.0;
+	}
+    
+    private double computeTextValue(String s) {
+	    double ret = 5;
+	    return ret;
+	}
+    
     public void dowork() {
 		int i = 0;
 		BufferedReader br = null;
@@ -186,7 +283,7 @@ public class CleanerMyCrawler {
 				if (url.indexOf('#') == 0) {
 				    continue;
 				}
-				todoQ.enqueue(url, Integer.parseInt(reader.get("configuration|DefaultWeighttOfSeed")));
+				todoQ.enqueue(url, computeURLValue(url), 0);
 				doneH.put(md5Hash(url), true);
 				System.out.println(url + " added.\n");
 		    }
@@ -214,8 +311,9 @@ public class CleanerMyCrawler {
 		CleanerMyCrawler c = new CleanerMyCrawler();
 		reader = new XMLReader();
 		c.directory = reader.get("configuration|DownloadDirectory");
-		c.checkAndCreateDirectories();
+		c.InitSetup();
 		c.dowork();
+
     }
 } 
 

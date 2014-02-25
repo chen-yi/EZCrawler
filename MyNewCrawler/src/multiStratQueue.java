@@ -13,9 +13,17 @@ import java.util.Iterator;
 public class multiStratQueue {
     double MAXINVALIDRATIO = .5;
     int MINSIZEFORCLEAN = 1000;
+    class URLInfo {
+		int depth;
+		URLInfo(int depth) {
+			this.depth = depth;
+		}
+		
+	};
     ArrayList<String> 	al = 		new ArrayList<String>();
     ArrayList<Boolean> 	valid = 	new ArrayList<Boolean>();
     ArrayList<Double> 	values = 	new ArrayList<Double>();
+    ArrayList<URLInfo> 	metaInfo = 	new ArrayList<URLInfo>();
     
     public void printQueue(String filename) {
     	BufferedWriter output = null;
@@ -99,21 +107,24 @@ public class multiStratQueue {
     
     int invalid = 0;
     
-    public String enqueue(String s, double value) {
+    public String enqueue(String s, double value, int depth) {
     	al.add(s);
     	valid.add(true);
     	values.add(value);
+    	metaInfo.add(new URLInfo(depth));
     	return s;
     }
     
-    public String enqueue(String s) {
-    	return enqueue(s, Double.MIN_VALUE);
+    public String enqueue(String s, int depth) {
+    	return enqueue(s, Double.MIN_VALUE, depth);
     }
     
     public String[] dequeue(String method) {
-    	String[] ret = new String[2];
+    	String[] ret = new String[3];
     	String s = null;
+    	int depth = -1;
     	Double val = Double.MIN_VALUE;
+    	
     	if (al.size() >  invalid) {
 	    	if (method.equalsIgnoreCase("first")) {
 	    		int start = 0;
@@ -123,6 +134,7 @@ public class multiStratQueue {
 	    		    	val = values.get(start);
 	    		    	valid.set(start, false);
 	    			    invalid++;
+	    			    depth = metaInfo.get(start).depth;
 	    		    	break;
 	    		    }
 	    		    start++;
@@ -136,6 +148,7 @@ public class multiStratQueue {
 	    		    	val = values.get(start);
 	    		    	valid.set(start, false);
 	    			    invalid++;
+	    			    depth = metaInfo.get(start).depth;
 	    		    	break;
 	    		    }
 	    		    start--;
@@ -151,6 +164,7 @@ public class multiStratQueue {
 				    s = al.get(start);
 				    val = values.get(start);
 				    valid.set(start, false);
+				    depth = metaInfo.get(start).depth;
 				    invalid++;
 				}
 	    	} 
@@ -160,11 +174,17 @@ public class multiStratQueue {
 	    		if (many == 0) {
 	    			many = 1;
 	    		}
-	    		double bestval   = Double.MIN_VALUE;
-	    		int bestindex  = -1;
+	    		
+	    		int bestindex  = 0;
+	    		while (!valid.get(bestindex)) {
+	    			bestindex++;
+	    			if (bestindex >= al.size()) {
+	    				//bugbug
+	    			}
+    			}
+	    		double bestval   = values.get(bestindex);
 	    		int index = (int) (Math.random() * al.size());
 	    		while (tried++ < many) {
-	    			
 	    			while (!valid.get(index)) {
 	    				index = (index + 1) % al.size();
 	    			}
@@ -174,9 +194,11 @@ public class multiStratQueue {
 	    			}
 	    			index = (index + 1) % al.size();
 	    		}
+	    		
 				s = al.get(bestindex);
 				val = values.get(bestindex);
 	    		valid.set(bestindex, false);
+	    		depth = metaInfo.get(bestindex).depth;
 	    		invalid++;
 	    	} else {
 	    		String tmp[] = dequeue("first");
@@ -190,6 +212,7 @@ public class multiStratQueue {
 		}
 		ret[0] = s;
 		ret[1] = ""+val;
+		ret[2] = ""+depth;
 		if (Math.random() < .01) {
 			System.out.println(s + " " + val);
 		}
@@ -225,7 +248,7 @@ public class multiStratQueue {
     	multiStratQueue Q = new multiStratQueue();
     	for (int i = 0; i < 1000; i++) {
     		Double d = Math.random();
-    		Q.enqueue(""+d, d);
+    		Q.enqueue(""+d, d, 0);
     	}
     	
     	for (int i = 0; i < 1005; i++) {
