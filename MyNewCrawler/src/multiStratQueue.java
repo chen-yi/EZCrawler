@@ -13,18 +13,27 @@ import java.util.Iterator;
 public class multiStratQueue {
     double MAXINVALIDRATIO = .5;
     int MINSIZEFORCLEAN = 1000;
+    
     class URLInfo {
 		int depth;
 		URLInfo(int depth) {
 			this.depth = depth;
-		}
-		
+		}		
 	};
-    ArrayList<String> 	al = 		new ArrayList<String>();
-    ArrayList<Boolean> 	valid = 	new ArrayList<Boolean>();
-    ArrayList<Double> 	values = 	new ArrayList<Double>();
-    ArrayList<URLInfo> 	metaInfo = 	new ArrayList<URLInfo>();
+	
+    ArrayList<String> al;
+    ArrayList<Boolean> valid;
+    ArrayList<Double> values;
+    ArrayList<URLInfo> metaInfo;
     
+    public multiStratQueue() {
+    	al = new ArrayList<String>();
+    	valid = new ArrayList<Boolean>();
+    	values = new ArrayList<Double>();
+    	metaInfo = new ArrayList<URLInfo>();
+    }
+    
+    // not used
     public void printQueue(String filename) {
     	BufferedWriter output = null;
 		try{
@@ -51,6 +60,7 @@ public class multiStratQueue {
 	    }
     }
     
+    // not used
     public boolean readQueue(String filename) {
     	boolean ok = true;
     	InputStream is = null; 
@@ -98,25 +108,18 @@ public class multiStratQueue {
 		return ok;
     }
     
-    public void lockExternally() {
-    
-    }
-    public void unlockExternally() {
-    
-    }
-    
     int invalid = 0;
     
-    public String enqueue(String s, double value, int depth) {
+    public void enqueue(String s, double value, int depth) {
     	al.add(s);
     	valid.add(true);
     	values.add(value);
     	metaInfo.add(new URLInfo(depth));
-    	return s;
     }
     
-    public String enqueue(String s, int depth) {
-    	return enqueue(s, Double.MIN_VALUE, depth);
+    // not used
+    public void enqueue(String s, int depth) {
+    	enqueue(s, Double.MIN_VALUE, depth);
     }
     
     public String[] dequeue(String method) {
@@ -132,9 +135,9 @@ public class multiStratQueue {
 	    		    if (valid.get(start)) {
 	    		    	s = al.get(start);
 	    		    	val = values.get(start);
+	    		    	depth = metaInfo.get(start).depth;
 	    		    	valid.set(start, false);
-	    			    invalid++;
-	    			    depth = metaInfo.get(start).depth;
+	    			    invalid++;	    			    
 	    		    	break;
 	    		    }
 	    		    start++;
@@ -146,9 +149,9 @@ public class multiStratQueue {
 	    		    if (valid.get(start)) {
 	    		    	s = al.get(start);
 	    		    	val = values.get(start);
+	    		    	depth = metaInfo.get(start).depth;
 	    		    	valid.set(start, false);
-	    			    invalid++;
-	    			    depth = metaInfo.get(start).depth;
+	    			    invalid++;    			    
 	    		    	break;
 	    		    }
 	    		    start--;
@@ -176,12 +179,13 @@ public class multiStratQueue {
 	    		}
 	    		
 	    		int bestindex  = 0;
-	    		while (!valid.get(bestindex)) {
-	    			bestindex++;
-	    			if (bestindex >= al.size()) {
-	    				//bugbug
+	    		try {
+	    			while(!valid.get(bestindex)){
+	    				bestindex++;
 	    			}
-    			}
+	    		} catch(IndexOutOfBoundsException e){
+	    			System.out.println("Error dequeuing valid element");
+	    		}
 	    		double bestval   = values.get(bestindex);
 	    		int index = (int) (Math.random() * al.size());
 	    		while (tried++ < many) {
@@ -193,8 +197,7 @@ public class multiStratQueue {
 	    				bestval = values.get(index);
 	    			}
 	    			index = (index + 1) % al.size();
-	    		}
-	    		
+	    		}    		
 				s = al.get(bestindex);
 				val = values.get(bestindex);
 	    		valid.set(bestindex, false);
@@ -204,21 +207,23 @@ public class multiStratQueue {
 	    		String tmp[] = dequeue("first");
 	    		s = tmp[0];
 	    		val = Double.parseDouble(tmp[1]);
+	    		depth = Integer.parseInt(tmp[2]);
 	    	}
     	}
     	int alsize = al.size();
 		if ((alsize > MINSIZEFORCLEAN) && (invalid > alsize * MAXINVALIDRATIO)) {
-				requestClean();
+			requestClean();
 		}
 		ret[0] = s;
 		ret[1] = ""+val;
 		ret[2] = ""+depth;
-		if (Math.random() < .01) {
-			System.out.println(s + " " + val);
-		}
+//		if (Math.random() < .01) {
+//			System.out.println(s + " " + val);
+//		}
 		return ret;
     }
     
+    // not used
     public void printStatus() {
 		System.out.print("Size: " + al.size() + " invalid: " + invalid +" invalid ratio: ");
 		System.out.print(invalid/(al.size() + 0.00000001));
@@ -226,33 +231,31 @@ public class multiStratQueue {
     }
     
     private void requestClean() {
-		if ((al.size() > MINSIZEFORCLEAN) && (invalid > al.size() * MAXINVALIDRATIO)) {
-		    ArrayList<String> al1 = new ArrayList<String>();
-		    ArrayList<Boolean> valid1 = new ArrayList<Boolean>();
-		    ArrayList<Double> values1 = 	new ArrayList<Double>();
-		    for (int i = 0; i < al.size(); i++) {
-		    	if (valid.get(i)) {
-		    		al1.add(al.get(i));
-		    		valid1.add(true);
-		    		values1.add(values.get(i));
-		    	}
-		    }
-		    al = al1;
-		    valid = valid1;
-		    invalid = 0;
-		    values = values1;
-		}
+    	ArrayList<String> al1 = new ArrayList<String>();
+	    ArrayList<Boolean> valid1 = new ArrayList<Boolean>();
+	    ArrayList<Double> values1 = new ArrayList<Double>();
+	    for (int i = 0; i < al.size(); i++) {
+	    	if (valid.get(i)) {
+	    		al1.add(al.get(i));
+	    		valid1.add(true);
+	    		values1.add(values.get(i));
+	    	}
+	    }
+	    al = al1;
+	    valid = valid1;
+	    invalid = 0;
+	    values = values1;
     }
     
-    public static void main(String[] args) {
-    	multiStratQueue Q = new multiStratQueue();
-    	for (int i = 0; i < 1000; i++) {
-    		Double d = Math.random();
-    		Q.enqueue(""+d, d, 0);
-    	}
-    	
-    	for (int i = 0; i < 1005; i++) {
-    		System.out.println(i + " " + Q.dequeue("bestofmany"));
-    	}
-    }
+//    public static void main(String[] args) {
+//    	multiStratQueue Q = new multiStratQueue();
+//    	for (int i = 0; i < 1000; i++) {
+//    		Double d = Math.random();
+//    		Q.enqueue(""+d, d, 0);
+//    	}
+//    	
+//    	for (int i = 0; i < 1005; i++) {
+//    		System.out.println(i + " " + Q.dequeue("bestofmany"));
+//    	}
+//    }
 }

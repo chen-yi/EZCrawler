@@ -9,13 +9,11 @@ import org.dom4j.Element;
 import org.dom4j.Node;
 import org.dom4j.io.SAXReader;
 
-
 public class XMLReader {
 	final private String filename = "config.xml";
 	private Document config;
 	private Element root;
 	public SAXReader reader = new SAXReader();
-	
 	
 	public XMLReader() {
 		config = null;
@@ -32,10 +30,8 @@ public class XMLReader {
 			try {
 				config = reader.read(filename);
 			} catch (DocumentException e) {
-				// TODO Auto-generated catch block
 				e.printStackTrace();
-			}
-			//root = config.getRootElement();		
+			}					
 		}
 		String[] dirs = destination.split("\\|");
 		StringBuilder sb = new StringBuilder();
@@ -55,15 +51,18 @@ public class XMLReader {
 	
 	
 	public int getIntValue(String element){
+		root = config.getRootElement(); // not using these four methods, or putting this in construct
 		return Integer.parseInt(root.elementText(element));
 	}
 	
 	public String getStringValue(String element){
+		root = config.getRootElement();
 		return root.elementText(element);
 	}
 	
 	@SuppressWarnings("unchecked")
 	public ArrayList<String> getListValue(String element, String subelement){
+		root = config.getRootElement();
 		Element e = root.element(element);
 		ArrayList<String> strings = new ArrayList<String>();
 		Iterator<Element> it = e.elementIterator(subelement);		
@@ -80,6 +79,7 @@ public class XMLReader {
 		Hashtable<String, Double> pairs = new Hashtable<String, Double>();
 		ArrayList<String> strings = getListValue(element, subelement);
 		for(int i=0; i<strings.size(); i++){
+			
 			StringTokenizer st = new StringTokenizer(strings.get(i));
 			String key = "";
 			Double value = 0.0;

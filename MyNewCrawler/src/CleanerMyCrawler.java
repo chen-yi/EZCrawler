@@ -1,6 +1,7 @@
 import java.util.ArrayList;
 import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.io.BufferedReader;
@@ -17,16 +18,22 @@ public class CleanerMyCrawler {
     final int SUBDIRMININDEX = 0;
     final int SUBDIRMAXINDEX = 20;
     int downLoaded = 0;
-    private java.util.concurrent.locks.ReentrantLock L = new java.util.concurrent.locks.ReentrantLock();
+    private ReentrantLock L = new ReentrantLock();
     private static XMLReader reader = null;
     private String[] avoidURLRegexes = null;
     private String[] preferredURLRegexes = null;
     
-    public XMLReader getConfigReader() {
-    	return reader;
+    Hashtable<String, Boolean> doneH = null;
+    multiStratQueue todoQ = null;
+	    
+    public CleanerMyCrawler() {
+		doneH = new Hashtable<String, Boolean>();
+		todoQ = new multiStratQueue();
+		reader = new XMLReader();
     }
     
-    private void InitSetup () {
+    private void initSetup () {
+		directory = reader.get("configuration|DownloadDirectory");
     	for (int i = 0; i < Integer.parseInt(reader.get("configuration|NumberOfDownloadSubDirs")); i++) {
 		    File theDir = new File(directory + "/" + i);
 		    if (!theDir.exists()) {
@@ -34,58 +41,38 @@ public class CleanerMyCrawler {
 		    }
     	}
  		avoidURLRegexes = reader.get("configuration|AvoidURLRegexes").split("\\s+");
- 		preferredURLRegexes = reader.get("configuration|PreferredURLRegexes").split("\\s+");
-    	
+ 		preferredURLRegexes = reader.get("configuration|PreferredURLRegexes").split("\\s+");   	
     }
+        
     
-    public String md5Hash(String s) {
-		String ret = "MD5FAILED"; 
-		try {
-		    MessageDigest md = MessageDigest.getInstance("MD5");
-		    StringBuffer sb = new StringBuffer();
-		    for (byte b : md.digest(s.getBytes("UTF-8"))) {
-		    	sb.append(Integer.toHexString((int) (b & 0xff)));
-		    }
-		    ret = sb.toString();
-		} catch (Exception e) {
-		}
-		return ret;
-    }
-    
+    // multithreading mechanism implemented
     private class Worker implements Runnable {
 		Hashtable<String, Boolean> doneH = null;
 		multiStratQueue todoQ = null;
-		BufferedWriter output1 = null;
+		BufferedWriter dictionaryOutput = null;
 		int myId = -1;
 		
 		public Worker(int id, multiStratQueue q, Hashtable<String, Boolean> h) {
-		    doneH = h;
-		    todoQ = q;
-		    myId = id;
-		}
-		
-		
-		
+			myId = id;
+			todoQ = q;
+		    doneH = h;		    
+		}		
+				
 		public void run() {
-			int  depthofParent = -1;
-			
+			int  depthOfParent = -1;
+			// each thread has a dictionary file
 			String dictionaryFile = reader.get("configuration|PathToOutputDictionary") +
-					reader.get("configuration|StemForDictionary") + myId + ".txt";
-					
-			
+					reader.get("configuration|StemForDictionary") + myId + ".txt";								
 			try {
-			    File file = new File(dictionaryFile);
+				File file = new File(dictionaryFile);
 			    if (!file.exists()) {
 					file.createNewFile();	
-				    output1 = new BufferedWriter(new FileWriter(dictionaryFile));
-					/*output.write(url.length() + "\t" + jp.getText().length() + "\t" + url + "\n");
-					output.write(jp.getText()+"\n");//use Yi's html parser*/
+					dictionaryOutput = new BufferedWriter(new FileWriter(dictionaryFile));	
 			    } else {
-			    	return;//in an error situation just give up.
+			    	return; // in an error situation just give up.
 			    }
 			} catch (Exception e) {
-			    System.out.println("Could not open " + dictionaryFile + " for url");
-			    return;
+				System.out.println("Could not open and write " + dictionaryFile + " for url");
 			}
 			
 			boolean stop = false;
@@ -98,15 +85,10 @@ public class CleanerMyCrawler {
 				    L.lock();
 				    String[] tmp = todoQ.dequeue("bestofmany");
 				    url = tmp[0];
-				    depthofParent = Integer.parseInt(tmp[2]);
-				    System.out.println("depth url configvalue: "+
-				    		depthofParent + " " +
-				    		url + " " +  Integer.parseInt(reader.get("configuration|MaxDepth")));
-				    		
-				    if (depthofParent >= Integer.parseInt(reader.get("configuration|MaxDepth"))) {
+				    depthOfParent = Integer.parseInt(tmp[2]);		    		
+				    if (depthOfParent >= Integer.parseInt(reader.get("configuration|MaxDepth"))) {
 				    	url = null;
 				    }
-				    System.out.println("URL found in queue: " + url);
 				    L.unlock();
 				    try {
 				    	Thread.sleep(Integer.parseInt(reader.get("configuration|PolitenessInMS")));
@@ -117,67 +99,86 @@ public class CleanerMyCrawler {
 				if (url == null) {
 				    System.out.println("I got nothing. Exiting thread.\n");
 				    stop = true;
-				    //return;
 				} else {
 				    String md5 = md5Hash(url);
-				    int h = 0; //BUGBUG fix this hashing function if severely unbalanced.
+				    int h = 0; 
 				    for (int i = SUBDIRMININDEX; i <= SUBDIRMAXINDEX; i++) {
 				    	h += md5.charAt(i);
 				    }
 				    h = h % Integer.parseInt(reader.get("configuration|NumberOfDownloadSubDirs"));
 		
 				    String filename = directory + h + "/" + md5 + ".txt";
-				    System.out.println("Creating file: " + filename);
+				    System.out.println("Creating file: " + filename);			    
 				    tried = 0;
-				    while ((tried < Integer.parseInt(reader.get("configuration|NumberOfTriesOnURLBeforeGiveUp")))) {	
-						tried++;
-						if (downLoaded > Integer.parseInt(reader.get("configuration|MaxURLsApproximately"))) {
+				    while ((tried++ < Integer.parseInt(reader.get("configuration|NumberOfTriesOnURLBeforeGiveUp")))) {
+				    	System.out.println("into while: tried = " + tried + " myId: " + myId);
+						if (downLoaded >= Integer.parseInt(reader.get("configuration|MaxURLsApproximately"))) {
 							continue;
 						}
-						System.out.println("Before JP process ");
+						System.out.println("Before JP process");
 						if (jp.process(url)) {
 							downLoaded++;
 							System.out.println("Downloaded " + downLoaded);
-							try {
-								output1.write(url + "\t" + filename + "\n");
-								System.out.println(url + "\t" + filename + "*******\n");
-							} catch (IOException e1) {
-								e1.printStackTrace();
+							try {								
+								dictionaryOutput.write(url + "\t" + filename + "\n");
+								dictionaryOutput.flush();
+								System.out.println("writing dictionary " + myId);
+							} catch (Exception e) {
+							    System.out.println("Could not write " + dictionaryFile + " for url");
 							}
+							
 						    System.out.println(url + " processed successfully. Tried " + tried + " times.");
-						    ArrayList<String> al = jp.getLinks("IGNORE THIS", true);
-						    Iterator<String> it = al.iterator();
+						    ArrayList<String> links = jp.getLinks("IGNORE THIS", true);
+						    Iterator<String> it = links.iterator();
 						    int linksAdded = 0;
+						    L.lock();
 						    while ((it.hasNext()) && (linksAdded < Integer.parseInt(reader.get("configuration|MaxBreadth")))) {
 								String s = it.next();
+								if ((s.length() == 0) || (s.indexOf('#') == 0)) {
+								    continue;
+								}
 								if (mustAvoid(s)) {
 									continue;
-								}
-								String hashv = md5Hash(s);
-								double newval = computeURLValue(s) + computeTextValue(jp.getText());
-								L.lock();
-								if ((newval > 0) && (!doneH.containsKey(hashv))) {
+								}								
+								String hashV = md5Hash(s);
+								double newVal = computeURLValue(s) + computeTextValue(jp.getText());
+								if ((newVal > 0.0) && (!doneH.containsKey(hashV))) {
 								    linksAdded++;
-								    doneH.put(hashv, true);
-								    todoQ.enqueue(s, newval, depthofParent+1);
-								    if (depthofParent > 1) {
-								    	System.out.println("New Depth " + depthofParent + " " + s + " added to queue.\n");
+								    System.out.println("linksAdded: " + linksAdded);
+								    doneH.put(hashV, true);
+								    todoQ.enqueue(s, newVal, depthOfParent+1);
+								    if (depthOfParent > 1) {
+								    	System.out.println("New Depth " + depthOfParent + " " + s + " added to queue.\n");
 								    }
 								}
-								L.unlock();		
+										
 								try {
 								    File file = new File(filename);
 								    if (!file.exists()) {
 										file.createNewFile();	
-										BufferedWriter output = new BufferedWriter(new FileWriter(file));
+										BufferedWriter output = new BufferedWriter(new FileWriter(filename));
 										output.write(url.length() + "\t" + jp.getText().length() + "\t" + url + "\n");
-										output.write(jp.getText()+"\n");//use Yi's html parser
+										output.write("<CRAWLERDOWNLOADEDHTML>" + "\n");
+										if (reader.get("configuration|OutputFormat").equals("TEXTONLY")) {
+											output.write("NOTREQUESTED_NOTREQUESTED" + "\n");
+										} else {
+											output.write(jp.getHTML() + "\n");
+										}
+										output.write("</CRAWLERDOWNLOADEDHTML>" + "\n");
+										output.write("<CRAWLERPARSETEXT>" + "\n");
+										if (reader.get("configuration|OutputFormat").equals("HTMLONLY")) {
+											output.write("NOTREQUESTED_NOTREQUESTED" + "\n");
+										} else {
+											output.write(jp.getText() + "\n");
+										}
+										output.write("</CRAWLERPARSETEXT>" + "\n");
 										output.close();
 								    }
 								} catch (Exception e) {
 								    System.out.println("Could not open " + filename + " for url");
 								}
 						    }
+						    L.unlock();
 						    break;
 						} else {
 							System.out.println(url + " was not processed successfully. Tried " + tried + " times.");
@@ -188,6 +189,7 @@ public class CleanerMyCrawler {
 						}
 				    }
 				    if (tried >= Integer.parseInt(reader.get("configuration|NumberOfTriesOnURLBeforeGiveUp"))) {
+				    	System.out.println("Fail to download "+ url);
 				    	try {
 						    File file = new File(filename);
 						    if (!file.exists()) {
@@ -202,9 +204,9 @@ public class CleanerMyCrawler {
 				    }
 				}
 		    }
-			if (output1 != null) {
-				try {
-					output1.close();
+			if (dictionaryOutput != null) {
+				try {					
+					dictionaryOutput.close();
 				} catch (IOException e) {
 					e.printStackTrace();
 				}
@@ -213,7 +215,7 @@ public class CleanerMyCrawler {
 
 		private boolean mustAvoid(String s) {
 			for (int i = 0; i < avoidURLRegexes.length; i++) {
-				if (avoidURLRegexes[i].indexOf('#') == 0) {
+				if ((avoidURLRegexes[i].length() == 0) || (avoidURLRegexes[i].indexOf('#') == 0)) {
 					continue;
 				}
 				Pattern pattern = Pattern.compile(avoidURLRegexes[i]);
@@ -226,26 +228,10 @@ public class CleanerMyCrawler {
 		}
     }
     
-    Hashtable<String, Boolean> doneH = null;
-    multiStratQueue todoQ = null;
-	    
-    public CleanerMyCrawler() {
-		doneH = new Hashtable<String, Boolean>();
-		todoQ = new multiStratQueue();
-    }
-	 	
-    public String zip () {
-		String ret = "";
-		for (int i = 0; i < 5; i++) {
-		    ret = ret + (int) (10 * Math.random());
-		}
-		return ret;	
-    }
- 	
-       
-    public void msSleepSafely(int MS) {
+         
+    public void msSleepSafely(int ms) {
 		try {
-		    Thread.sleep(MS);
+		    Thread.sleep(ms);
 		} catch (Exception e) {
 		}
     }
@@ -265,11 +251,35 @@ public class CleanerMyCrawler {
 	}
     
     private double computeTextValue(String s) {
-	    double ret = 5;
+	    double ret = 0.0;    
+		String[] strings = reader.get("configuration|PreferedURLText").split("\\s+");
+		for (int i=0; i<strings.length; i++) {	
+			String key = strings[i++];
+			Double value = Double.parseDouble(strings[i]);
+			Pattern pattern = Pattern.compile(key);
+			Matcher matcher = pattern.matcher(s);
+			if(matcher.find()){
+				ret += value;
+			}					
+		}		
 	    return ret;
 	}
     
-    public void dowork() {
+    private String md5Hash(String s) {
+		String ret = "MD5FAILED"; 
+		try {
+		    MessageDigest md = MessageDigest.getInstance("MD5");
+		    StringBuffer sb = new StringBuffer();
+		    for (byte b : md.digest(s.getBytes("UTF-8"))) {
+		    	sb.append(Integer.toHexString((int) (b & 0xff)));
+		    }
+		    ret = sb.toString();
+		} catch (Exception e) {
+		}
+		return ret;
+    }
+    
+    private void dowork() {
 		int i = 0;
 		BufferedReader br = null;
 		try {
@@ -277,15 +287,12 @@ public class CleanerMyCrawler {
 		    String url = null;
 		    while ((url = br.readLine()) != null) {
 				url = url.trim();
-				if (url.length()==0) {
-				    continue;
-				}
-				if (url.indexOf('#') == 0) {
+				if ((url.length() == 0) || (url.indexOf('#') == 0)){
 				    continue;
 				}
 				todoQ.enqueue(url, computeURLValue(url), 0);
 				doneH.put(md5Hash(url), true);
-				System.out.println(url + " added.\n");
+				// System.out.println(url + " added.\n");
 		    }
 		} catch (FileNotFoundException e) {
 		    e.printStackTrace();
@@ -308,12 +315,9 @@ public class CleanerMyCrawler {
     }
 	
     public static void main(String[] args) {
-		CleanerMyCrawler c = new CleanerMyCrawler();
-		reader = new XMLReader();
-		c.directory = reader.get("configuration|DownloadDirectory");
-		c.InitSetup();
+		CleanerMyCrawler c = new CleanerMyCrawler();	
+		c.initSetup();
 		c.dowork();
-
     }
 } 
 

@@ -4,25 +4,25 @@
 		/home/neeraj/Documents/crawlerdata.tmp/CrawlTheseURLs.txt
 	</CrawlSeedFile> -->
 	<CrawlSeedFile>
-		/Users/yichen/Documents/crawlerdata.tmp/CrawlTheseURLs.txt
+		CrawlTheseURLs.txt
 	</CrawlSeedFile>
 	<DefaultWeightOfSeed>
 		100
 	</DefaultWeightOfSeed>
 	<NumberOfTriesOnURLBeforeGiveUp>
-		5
+		10
 	</NumberOfTriesOnURLBeforeGiveUp>
 	<NumberOfTriesBeforeGivingUpOnQueue>
 		10
 	</NumberOfTriesBeforeGivingUpOnQueue>	
 	<MaxDepth>
-		100
+		40
 	</MaxDepth>
 	<MaxBreadth>
-		200
+		30
 	</MaxBreadth>
 	<MaxURLsApproximately>
-		200
+		350
 	</MaxURLsApproximately>
 	<NumberOfThreads>
 		5
@@ -49,17 +49,12 @@
 		DownloadedFiles
 	</StemForDictionary>
 	<PreferredURLRegexes>
-		cnn
-		asd[0-9]
-		dfg*
+		c
 	</PreferredURLRegexes>
 	<AvoidURLRegexes>
-		
+			
 	</AvoidURLRegexes>
 	<PreferedURLText>
-		Tesla	0.5
-		Olympics	0.7
-		reform	0.9
-		people	0.4
+		Address	0.4
 	</PreferedURLText>	
 </configuration>
