@@ -6,9 +6,9 @@
 	<CrawlSeedFile>
 		CrawlTheseURLs.txt
 	</CrawlSeedFile>
-	<DefaultWeightOfSeed>
+	<!-- <DefaultWeightOfSeed>
 		100
-	</DefaultWeightOfSeed>
+	</DefaultWeightOfSeed> -->
 	<NumberOfTriesOnURLBeforeGiveUp>
 		10
 	</NumberOfTriesOnURLBeforeGiveUp>
@@ -41,7 +41,7 @@
 	</NumberOfDownloadSubDirs>	
 	<OutputFormat>
 		BOTHHTMLANDTEXT
-	</OutputFormat><!-- Options: HTMLONLY, TEXTONLY, BOTHHTMLANDTEXT -->
+	</OutputFormat>
 	<PathToOutputDictionary>
 		/Users/yichen/Documents/DownloadExperiment.tmp/
 	</PathToOutputDictionary>
